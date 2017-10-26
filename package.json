@@ -1,0 +1,23 @@
+{
+  "name": "hivekernal",
+  "version": "1.0.0",
+  "description": "Core kernel for virtual envrioment ",
+  "main": "kernel.test.js",
+  "scripts": {
+    "test": "mocha **/*.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pinnet/hivekernal.git"
+  },
+  "author": "Danny Arnold",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/pinnet/hivekernal/issues"
+  },
+  "homepage": "https://github.com/pinnet/hivekernal#readme",
+  "devDependencies": {
+    "expect": "^21.2.1",
+    "mocha": "^4.0.1"
+  }
+}
