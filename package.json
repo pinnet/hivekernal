@@ -21,6 +21,7 @@
     "mocha": "^4.0.1"
   },
   "dependencies": {
+    "async-mqtt": "^1.0.1",
     "detect-node": "^2.0.3",
     "dom-storage": "^2.0.2",
     "mqtt": "^2.13.1",

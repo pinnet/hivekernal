@@ -1,21 +1,26 @@
-var isNode = require('detect-node');
-var Storage = require('dom-storage');
+const isNode = require('detect-node');
+const Storage = require('dom-storage');
 const uuidv1 = require('uuid/v1');
-var mqtt = require('mqtt');
+const mqtt = require('async-mqtt');
+
 var client;
-var ID;
-var QOS;
+var endpoint;
 var UUID;
+var ID;
 
 class Kernel {
+   
 
     constructor(){
        
         this.localStorage = new Storage('./db.json', { strict: false, ws: '  ' });
         this.sessionStorage = new Storage(null, { strict: true });
-        ID = this.getID();
-        QOS = this.calculateQOS();
         UUID = this.getSessionID();
+        ID = this.getID();
+        endpoint = {
+            id:  ID,
+            qos: this.calculateQOS()
+        } 
     }
 
     getID(){ 
@@ -38,23 +43,15 @@ class Kernel {
 
     }
    
-    establishMQTT(){
+    async establishMQTT(){
         try{
-            client  = mqtt.connect('wws://broker.ue3.eu/mqtt',{
-                
+            client = await mqtt.connect('mqtt://broker.ue3.eu:8083',{
                 username:'chestnut',
                 password:'9C48FFB7FC319555C141DE44F726E40341' 
             });
-            client.options = {
-                port:443,
-                auth:true,
-                clean:true,
-                clientId:UUID
-            };
-
-            //if (!client.connected){ throw new Error(); }
-            client.on('connect', this.onConnect);     
-            client.on('message', this.onMessage);
+            await client.on('connect', this.onConnect);     
+            await client.on('message', this.onMessage);
+            
         }
         catch(e){
             console.log(e);
@@ -62,19 +59,36 @@ class Kernel {
         }
         return true;
     }
-    onConnect(){
-        client.subscribe('/db_log/global_network/');
-        client.publish('/db_log/global_network/','{' + ID + '}#'+ QOS ); 
+    async onConnect(){
+        
+        try{
+            await client.subscribe('/db_log/global_network/');
+            await client.subscribe(ID);
+            await client.publish('/db_log/global_network/',JSON.stringify(endpoint));
+            return true;
+        }
+        catch(e){
+            console.log(e);
+            return false;
+        } 
     }
 
-    onMessage(topic,message){
-        console.log(topic + message);
-         client.end();
-      
+    onMessage(topic, message){
+        if( message === undefined || message === null){ return false; }
+        if( topic === undefined || topic === null){ return false; }
+        if(topic === '/db_log/global_network/'){
+            if(message.includes(ID) ){ return false; }
+            console.log( topic + message);
+        }
+        if(topic ===ID)
+        {
+            console.log(message.toString())  
+        }
+        return true;
     }
     
     calculateQOS(){
-        return 0.0005.toString();
+        return 0.0075;
     }
 
     
