@@ -28,6 +28,18 @@ describe('Kernel Mqtt connection (kernel.js)',() => {
         })).toBeTruthy();
 
     });
+});
+describe('Kernel onMessage(message) (kernel.js)',() => {
+    it('onMessage should accept correct db log message', (done) => {
+        var result = kernel.onMessage('/db_log/global_network/','{"id":"1","qos": 0}'); 
+        expect(result).toBeTruthy();
+        done();
+    });
+    it('onMessage should accept correct incomming message', (done) => {
+        var result = kernel.onMessage(kernel.localStorage.getItem('ID'),'test'); 
+        expect(result).toBeTruthy();
+        done();
+    });
     it('onMessage should reject undefined message', (done) => {
         var result = kernel.onMessage('/db_log/global_network/',undefined); 
         expect(result).toBeFalsy();
@@ -38,8 +50,33 @@ describe('Kernel Mqtt connection (kernel.js)',() => {
         expect(result).toBeFalsy();
         done();
     });
+    it('onMessage should reject empty message', (done) => {
+        var result = kernel.onMessage('/db_log/global_network/',''); 
+        expect(result).toBeFalsy();
+        done();
+    });
+    it('onMessage should reject invalid endpoint [qos NAN]', (done) => {
+        var result = kernel.onMessage('/db_log/global_network/','{"id":"123","qos":"0"}'); 
+        expect(result).toBeFalsy();
+        done();
+    });
+    it('onMessage should reject invalid endpoint [qos > 1]', (done) => {
+        var result = kernel.onMessage('/db_log/global_network/','{"id":"123","qos":1.234}'); 
+        expect(result).toBeFalsy();
+        done();
+    });
+    it('onMessage should reject malformed endpoint', (done) => {
+        var result = kernel.onMessage('/db_log/global_network/','{"id":"1","qos":0'); 
+        expect(result).toBeFalsy();
+        done();
+    });
     it('onMessage should reject undefined topic', (done) => {
         var result = kernel.onMessage('/db_log/global_network/',undefined); 
+        expect(result).toBeFalsy();
+        done();
+    });
+    it('onMessage should reject empty topic', (done) => {
+        var result = kernel.onMessage('/db_log/global_network/',''); 
         expect(result).toBeFalsy();
         done();
     });
