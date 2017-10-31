@@ -1,5 +1,6 @@
 const expect = require('expect');
 var Storage = require('dom-storage');
+const uuidv4 = require('uuid/v4');
 
 const {Kernel} = require('./kernel');
  var kernel = new Kernel();
@@ -88,6 +89,36 @@ describe('Kernel onMessage(message) (kernel.js)',() => {
     it('onMessage should reject own id on topic /db_log/global_network/', (done) => {
         var result = kernel.onMessage('/db_log/global_network/',kernel.getID()); 
         expect(result).toBeFalsy();
+        done();
+    });
+    it('onMessage should accept multiple endpoints 32k', (done) => {
+        for (var n =0;n < 32000;n++){
+        
+        kernel.onMessage('/db_log/global_network/','{"id":"'+ uuidv4() +'","qos":0}'); 
+        
+        
+        }
+        //expect(result).toBeFalsy();
+        done();
+    });
+    it('onMessage should accept multiple endpoints 32k', (done) => {
+        for (var n =0;n < 32000;n++){
+        
+        kernel.onMessage('/db_log/global_network/','{"id":"'+ uuidv4() +'","qos":1}'); 
+        
+        
+        }
+        //expect(result).toBeFalsy();
+        done();
+    });
+    it('onMessage should accept multiple endpoints 32k', (done) => {
+        for (var n =0;n < 32000;n++){
+        
+        kernel.onMessage('/db_log/global_network/','{"id":"'+ uuidv4() +'","qos":1}'); 
+        
+        
+        }
+        //expect(result).toBeFalsy();
         done();
     });
 });

@@ -1,3 +1,5 @@
+const v8 = require('v8');
+var Worker = require('webworker-threads').Worker;
 const isNode = require('detect-node');
 const Storage = require('dom-storage');
 const uuidv1 = require('uuid/v1');
@@ -7,8 +9,27 @@ const IDBKeyRange = require("fake-indexeddb/lib/FDBKeyRange");
 
 
 class Kernel {
-
+    
      constructor(){
+        
+        this.endpoints = new Array();
+        
+        
+        this.dbWorker = new Worker(function (){
+           
+            this.onmessage = function(e) {
+                var i=0;
+                JSON.parse(e.data).every(function(val){
+                    postMessage(`${i++}:` + JSON.stringify(val));
+                    return true;
+                }); 
+            };             
+        });
+
+        this.dbWorker.onmessage = function(e){
+            console.log(e.data);             
+        }.bind(this);
+
 
         this.client;
         this.db = indexedDB.open("test", 3);
@@ -19,8 +40,16 @@ class Kernel {
             qos: this.calculateQOS()            
         }
         this.uuid = this.getSessionID()
-    }
+        var _this = this;
+        setInterval(function(){
+           
+            if (_this.endpoints.length > 0) {
+                _this.dbWorker.postMessage(JSON.stringify(_this.endpoints));
+            }
+            _this.endpoints = new Array();
 
+        },10);
+    } 
     getID(){ 
         var id = this.localStorage.getItem('ID');
 
@@ -70,7 +99,6 @@ class Kernel {
             return false;
         } 
     }
-    
     onMessage(topic, message){
 
         if( message === undefined || message === null || message.length == 0 ){ return false; }
@@ -85,23 +113,23 @@ class Kernel {
         }
         if (endpoint.id === undefined || endpoint.qos === undefined 
                 || typeof(endpoint.qos) != 'number' || endpoint.qos > 1){ return false; }
-            this.updateDB(endpoint);
+                
+                this.endpoints.push(endpoint);
+                
+                
+                //console.log(this.endpoints);
         }
         if(topic === this.endpoint.id)
         {
             this.onIncomming(message);   
         }
+
         return true;
     }
-    updateDB(endpoint){
-        
-        console.log(endpoint); 
-        
-        
-    }
+
     onIncomming(message){
         
-                console.log(message.toString()); 
+        console.log(message.toString()); 
         
         
     }
