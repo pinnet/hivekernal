@@ -92,7 +92,7 @@ describe('Kernel onMessage(message) (kernel.js)',() => {
         done();
     });
     it('onMessage should accept multiple endpoints 32k', (done) => {
-        for (var n =0;n < 32000;n++){
+        for (var n =0;n < 500;n++){
         
         kernel.onMessage('/db_log/global_network/','{"id":"'+ uuidv4() +'","qos":0}'); 
         
@@ -101,20 +101,10 @@ describe('Kernel onMessage(message) (kernel.js)',() => {
         //expect(result).toBeFalsy();
         done();
     });
-    it('onMessage should accept multiple endpoints 32k', (done) => {
-        for (var n =0;n < 32000;n++){
+    it('dblog should log multiple endpoints', (done) => {
+        for (var n =0;n < 500;n++){
         
-        kernel.onMessage('/db_log/global_network/','{"id":"'+ uuidv4() +'","qos":1}'); 
-        
-        
-        }
-        //expect(result).toBeFalsy();
-        done();
-    });
-    it('onMessage should accept multiple endpoints 32k', (done) => {
-        for (var n =0;n < 32000;n++){
-        
-        kernel.onMessage('/db_log/global_network/','{"id":"'+ uuidv4() +'","qos":1}'); 
+        kernel.dblog('{"id":"'+ uuidv4() +'","qos":1}'); 
         
         
         }

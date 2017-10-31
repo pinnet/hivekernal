@@ -1,5 +1,5 @@
 const v8 = require('v8');
-var Worker = require('webworker-threads').Worker;
+const Worker = require('webworker-threads').Worker;
 const isNode = require('detect-node');
 const Storage = require('dom-storage');
 const uuidv1 = require('uuid/v1');
@@ -9,28 +9,20 @@ const IDBKeyRange = require("fake-indexeddb/lib/FDBKeyRange");
 
 
 class Kernel {
-    
      constructor(){
-        
-        this.endpoints = new Array();
-        
-        
+        this.endpoints = new Array();        
         this.dbWorker = new Worker(function (){
-           
-            this.onmessage = function(e) {
-                var i=0;
+            var i=0;
+            this.onmessage = function(e) {                
                 JSON.parse(e.data).every(function(val){
                     postMessage(`${i++}:` + JSON.stringify(val));
                     return true;
                 }); 
             };             
         });
-
         this.dbWorker.onmessage = function(e){
-            console.log(e.data);             
+           // this should update endpoint db            
         }.bind(this);
-
-
         this.client;
         this.db = indexedDB.open("test", 3);
         this.localStorage = new Storage('./db.json', { strict: false, ws: '  ' });
@@ -42,13 +34,11 @@ class Kernel {
         this.uuid = this.getSessionID()
         var _this = this;
         setInterval(function(){
-           
             if (_this.endpoints.length > 0) {
                 _this.dbWorker.postMessage(JSON.stringify(_this.endpoints));
             }
             _this.endpoints = new Array();
-
-        },10);
+        },100);
     } 
     getID(){ 
         var id = this.localStorage.getItem('ID');
@@ -61,15 +51,12 @@ class Kernel {
     }
     getSessionID(){
         var uid = this.sessionStorage.getItem('uid');
-        
                 if (uid === null){
                     uid = uuidv1();
                     this.sessionStorage.setItem('uid',uid);
                 }
         return uid.toString();
-
     }
-   
     async establishMQTT(){
         try{
             this.client = await mqtt.connect('mqtt://broker.ue3.eu:8083',{
@@ -77,8 +64,7 @@ class Kernel {
                 password:'9C48FFB7FC319555C141DE44F726E40341' 
             });
             await this.client.on('connect', this.onConnect.bind(this));     
-            await this.client.on('message', this.onMessage.bind(this));
-            
+            await this.client.on('message', this.onMessage.bind(this)); 
         }
         catch(e){
             console.log(e);
@@ -87,17 +73,19 @@ class Kernel {
         return true;
     }
     async onConnect(){
-        
         try{
             await this.client.subscribe('/db_log/global_network/');
             await this.client.subscribe(this.endpoint.id);
-            await this.client.publish('/db_log/global_network/',JSON.stringify(this.endpoint));
+            await this.dblog(JSON.stringify(this.endpoint));
             return true;
         }
         catch(e){
             console.log(e);
             return false;
         } 
+    }
+    async dblog(endpoint){
+        await this.client.publish('/db_log/global_network/',endpoint);
     }
     onMessage(topic, message){
 
@@ -113,30 +101,22 @@ class Kernel {
         }
         if (endpoint.id === undefined || endpoint.qos === undefined 
                 || typeof(endpoint.qos) != 'number' || endpoint.qos > 1){ return false; }
-                
-                this.endpoints.push(endpoint);
-                
-                
-                //console.log(this.endpoints);
+               
+            if(this.endpoints.length < 500){
+                this.endpoints.push(endpoint);              
+            }
         }
         if(topic === this.endpoint.id)
         {
             this.onIncomming(message);   
         }
-
         return true;
     }
-
-    onIncomming(message){
-        
-        console.log(message.toString()); 
-        
-        
+    onIncomming(message){   
+        console.log(message.toString());   
     }
     calculateQOS(){
         return 0.0075;
-    }
-
-    
+    } 
 }
 module.exports = {Kernel};
