@@ -6,62 +6,27 @@ const uuidv1 = require('uuid/v1');
 const mqtt = require('async-mqtt');
 const indexedDB = require("fake-indexeddb");
 const IDBKeyRange = require("fake-indexeddb/lib/FDBKeyRange");
-
+var passed = true;
 
 class Kernel {
-     constructor(){
-        this.isOpenDB = false;
-        this.db = indexedDB.open("test", 3);
-        this.endpoints = new Array();        
-        this.dbWorker = new Worker(function (){
-           var i=0;  
-            this.onmessage = function(e) {  
-                //
-                JSON.parse(e.data).every(function(val){
-                    //global.indexedDB.open("test");
-                    postMessage(`${i++}:` + JSON.stringify(val));
-                    return true;
-                }); 
-            };             
-        });
-        this.db.onerror = function(e){
-            console.log(e.data);
-        }
+
+    constructor(){
+        this.db = indexedDB.open("test", 3);       
         this.db.onsuccess = function(e){
             console.log('success');
-            this.isOpenDB = true;
-        }
-        this.dbWorker.onmessage = function(e){
-            console.log(e.data);
-           // this should update endpoint db 
-        }.bind(this);
-
-        this.dbWorker.onerror = function (e){
-            console.log(e.data);
         }
         this.client;
-        
         this.localStorage = new Storage('./db.json', { strict: false, ws: '  ' });
         this.sessionStorage = new Storage(null, { strict: true });
         this.endpoint = {
-            id:  this.getID(),
-            qos: this.calculateQOS()            
+            id: this.getID(),
+            qos: this.calculateQOS()
         }
-        this.uuid = this.getSessionID()
-        
-        var _this = this;
-        setInterval(function(){                                                             // Periodicly send message array to dbworker
-            _this.sendMessageBuffer();
-        },1000);
+        this.uuid = this.getSessionID();
+    }
 
-    }
-    sendMessageBuffer(){
-        if (this.endpoints.length > 0) {
-            this.dbWorker.postMessage(JSON.stringify(this.endpoints));
-        }
-        this.endpoints = new Array();
-    }
     getID(){ 
+        
         var id = this.localStorage.getItem('ID');
 
         if (id === null){
@@ -84,8 +49,62 @@ class Kernel {
                 username:'chestnut',
                 password:'9C48FFB7FC319555C141DE44F726E40341' 
             });
-            await this.client.on('connect', this.onConnect.bind(this));     
-            await this.client.on('message', this.onMessage.bind(this)); 
+            await this.client.on('connect', this.onConnect.bind(this));
+            var _this = this; 
+            await this.client.on('message', function (topic,message) { 
+                
+                var passed = true;
+                var worker = new Worker(function (){
+                    
+                    onmessage = function(e) {
+                        var res = e.data.split('|');
+                        var topic = res[0];
+                        var message = res[1];
+                        
+                        console.log();
+                        if( message === undefined || message === null || message.length == 0 ){ return false; }
+                        if( topic === undefined || topic === null || topic.length == 0 ){  return false; }
+                        if( topic === '/db_log/global_network/' ){
+                            //console.log(Kernel.getID());
+                           // if(message.includes(Kernel.endpoint.id) ){  return false; }
+
+                            try{
+                                var endpoint = JSON.parse(message);
+                                console.log(message);
+                            }
+                            catch(e){
+                                return false; 
+                            }
+
+                            if (endpoint.id === undefined || endpoint.qos === undefined 
+                                || typeof(endpoint.qos) != 'number' || endpoint.qos > 1){ Kernel.passed = false; return false; }
+                            
+                            postMessage(message);
+                            return true;  
+                        }
+                        else if(topic === Kernel.endpoint.id)
+                        {
+                            postMessage(message);
+                            return true;  
+                        }
+                        return false;
+                
+                        
+                        };  
+                         
+                });
+            
+                
+                worker.postMessage(topic + '|' + message.toString());
+
+                worker.onmessage = function(e){
+                    
+                    console.log(e.data);
+            
+                };
+
+
+            });   
         }
         catch(e){
             console.log(e);
@@ -108,35 +127,7 @@ class Kernel {
     async dblog(endpoint){
         await this.client.publish('/db_log/global_network/',endpoint);
     }
-    onMessage(topic, message){                                                                   // MQTT message validitiy test and marshalling
-
-        if( message === undefined || message === null || message.length == 0 ){ return false; }
-        if( topic === undefined || topic === null || topic.length == 0 ){ return false; }
-        if( topic === '/db_log/global_network/' ){
-            
-            if(message.includes(this.endpoint.id) ){ return false; }
-            try{
-                var endpoint = JSON.parse(message);
-            }
-            catch(e){
-                return false; 
-            }
-            if (endpoint.id === undefined || endpoint.qos === undefined 
-                || typeof(endpoint.qos) != 'number' || endpoint.qos > 1){ return false; }
-            
-            this.endpoints.push(endpoint);   
-            if(this.endpoints.length > 500){                                                     // Push endpoint messages onto array untill buffer is full;
-                this.sendMessageBuffer();                                                        // then send endpoint buffer to dbworker
-            } 
-            return true;  
-        }
-        else if(topic === this.endpoint.id)
-        {
-            this.onIncomming(message); 
-            return true;  
-        }
-        return false;
-    }
+    
     onIncomming(message){   
         console.log(message.toString());   
     }
@@ -144,4 +135,4 @@ class Kernel {
         return 0.0075;
     } 
 }
-module.exports = {Kernel};
+module.exports = {Kernel,passed};

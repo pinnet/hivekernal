@@ -3,7 +3,14 @@ var Storage = require('dom-storage');
 const uuidv4 = require('uuid/v4');
 
 const {Kernel} = require('./kernel');
+var {passed} = require('./kernel');
+
  var kernel = new Kernel();
+
+ beforeEach(function() {
+  // kernel.passed = false;
+  });
+  
 describe('Kernel required before connection (kernel.js)',() => {
     it('should create a new instance', () => {
        
@@ -11,7 +18,7 @@ describe('Kernel required before connection (kernel.js)',() => {
     });
 
     it('getID() should establish persistant id', () => {
-        expect(kernel.getID()).toBe(kernel.localStorage.getItem('ID')); 
+        expect(Kernel.getID()).toBe(kernel.localStorage.getItem('ID')); 
     });
     it('getSessionID() should establish session id', () => {
         expect(kernel.getSessionID()).toBe(kernel.sessionStorage.getItem('uid')); 
@@ -32,81 +39,73 @@ describe('Kernel Mqtt connection (kernel.js)',() => {
 });
 describe('Kernel onMessage(message) (kernel.js)',() => {
     it('onMessage should accept correct db log message', (done) => {
-        var result = kernel.onMessage('/db_log/global_network/','{"id":"1","qos": 0}'); 
-        expect(result).toBeTruthy();
+        var result = kernel.dblog('{"id":"1","qos": 0}'); 
+        expect(passed).toBeTruthy();
         done();
     });
     it('onMessage should accept correct incomming message', (done) => {
-        var result = kernel.onMessage(kernel.localStorage.getItem('ID'),'test'); 
-        expect(result).toBeTruthy();
+        var result = kernel.dblog(kernel.localStorage.getItem('ID'),'test'); 
+        expect(passed).toBeTruthy();
         done();
     });
     it('onMessage should reject undefined message', (done) => {
-        var result = kernel.onMessage('/db_log/global_network/',undefined); 
-        expect(result).toBeFalsy();
+        var result = kernel.dblog(undefined); 
+        expect(passed).toBeFalsy();
         done();
     });
     it('onMessage should reject null message', (done) => {
-        var result = kernel.onMessage('/db_log/global_network/',null); 
-        expect(result).toBeFalsy();
+        var result = kernel.dblog(null); 
+        expect(passed).toBeFalsy();
         done();
     });
     it('onMessage should reject empty message', (done) => {
-        var result = kernel.onMessage('/db_log/global_network/',''); 
-        expect(result).toBeFalsy();
+        var result = kernel.dblog(''); 
+        expect(passed).toBeFalsy();
         done();
     });
     it('onMessage should reject invalid endpoint [qos NAN]', (done) => {
-        var result = kernel.onMessage('/db_log/global_network/','{"id":"123","qos":"0"}'); 
-        expect(result).toBeFalsy();
+        var result = kernel.dblog('{"id":"123","qos":"0"}'); 
+        expect(passed).toBeFalsy();
         done();
     });
     it('onMessage should reject invalid endpoint [qos > 1]', (done) => {
-        var result = kernel.onMessage('/db_log/global_network/','{"id":"123","qos":1.234}'); 
-        expect(result).toBeFalsy();
+        var result = kernel.dblog('{"id":"123","qos":1.234}'); 
+        expect(passed).toBeFalsy();
         done();
     });
     it('onMessage should reject malformed endpoint', (done) => {
-        var result = kernel.onMessage('/db_log/global_network/','{"id":"1","qos":0'); 
-        expect(result).toBeFalsy();
+        var result = kernel.dblog('{"id":"1","qos":0'); 
+        expect(passed).toBeFalsy();
         done();
     });
     it('onMessage should reject undefined topic', (done) => {
-        var result = kernel.onMessage('/db_log/global_network/',undefined); 
-        expect(result).toBeFalsy();
+        var result = kernel.dblog(undefined); 
+        expect(passed).toBeFalsy();
         done();
     });
     it('onMessage should reject empty topic', (done) => {
-        var result = kernel.onMessage('/db_log/global_network/',''); 
-        expect(result).toBeFalsy();
+        var result = kernel.dblog(''); 
+        expect(passed).toBeFalsy();
         done();
     });
     it('onMessage should reject null topic', (done) => {
-        var result = kernel.onMessage('/db_log/global_network/',null); 
-        expect(result).toBeFalsy();
+        var result = kernel.dblog(null); 
+        expect(passed).toBeFalsy();
         done();
     });
     it('onMessage should reject own id on topic /db_log/global_network/', (done) => {
-        var result = kernel.onMessage('/db_log/global_network/',kernel.getID()); 
-        expect(result).toBeFalsy();
+        var result = kernel.dblog(Kernel.getID()); 
+        expect(passed).toBeFalsy();
         done();
     });
-    it('onMessage should buffer 500 endpoint messages', (done) => {
-        kernel.sendMessageBuffer();
+    it('onMessage should take 500 endpoint messages', (done) => {
+        
         var result = false;
-        for (var n =0;n < 11000;n++){
-            result = kernel.onMessage('/db_log/global_network/','{"id":"'+ uuidv4() +'","qos":0}'); 
+        for (var n =0;n < 5;n++){
+            result = kernel.dblog('{"id":"'+ uuidv4() +'","qos":0}'); 
         }
-        expect(result).toBeTruthy();
+        expect(passed).toBeTruthy();
         done();
     });
     
-    it('dblog should log multiple endpoints', (done) => {
-        var result = false;
-        for (var n =0;n < 500;n++){
-            result =  kernel.dblog('{"id":"'+ uuidv4() +'","qos":1}'); 
-        }
-        expect(result).toBeTruthy();
-        done();
-    });
 });
