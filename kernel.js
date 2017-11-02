@@ -10,21 +10,37 @@ const IDBKeyRange = require("fake-indexeddb/lib/FDBKeyRange");
 
 class Kernel {
      constructor(){
+        this.isOpenDB = false;
+        this.db = indexedDB.open("test", 3);
         this.endpoints = new Array();        
         this.dbWorker = new Worker(function (){
-            var i=0;
-            this.onmessage = function(e) {                
+           var i=0;  
+            this.onmessage = function(e) {  
+                //
                 JSON.parse(e.data).every(function(val){
+                    //global.indexedDB.open("test");
                     postMessage(`${i++}:` + JSON.stringify(val));
                     return true;
                 }); 
             };             
         });
+        this.db.onerror = function(e){
+            console.log(e.data);
+        }
+        this.db.onsuccess = function(e){
+            console.log('success');
+            this.isOpenDB = true;
+        }
         this.dbWorker.onmessage = function(e){
-           // this should update endpoint db            
+            console.log(e.data);
+           // this should update endpoint db 
         }.bind(this);
+
+        this.dbWorker.onerror = function (e){
+            console.log(e.data);
+        }
         this.client;
-        this.db = indexedDB.open("test", 3);
+        
         this.localStorage = new Storage('./db.json', { strict: false, ws: '  ' });
         this.sessionStorage = new Storage(null, { strict: true });
         this.endpoint = {
@@ -32,14 +48,19 @@ class Kernel {
             qos: this.calculateQOS()            
         }
         this.uuid = this.getSessionID()
+        
         var _this = this;
-        setInterval(function(){
-            if (_this.endpoints.length > 0) {
-                _this.dbWorker.postMessage(JSON.stringify(_this.endpoints));
-            }
-            _this.endpoints = new Array();
-        },100);
-    } 
+        setInterval(function(){                                                             // Periodicly send message array to dbworker
+            _this.sendMessageBuffer();
+        },1000);
+
+    }
+    sendMessageBuffer(){
+        if (this.endpoints.length > 0) {
+            this.dbWorker.postMessage(JSON.stringify(this.endpoints));
+        }
+        this.endpoints = new Array();
+    }
     getID(){ 
         var id = this.localStorage.getItem('ID');
 
@@ -87,30 +108,34 @@ class Kernel {
     async dblog(endpoint){
         await this.client.publish('/db_log/global_network/',endpoint);
     }
-    onMessage(topic, message){
+    onMessage(topic, message){                                                                   // MQTT message validitiy test and marshalling
 
         if( message === undefined || message === null || message.length == 0 ){ return false; }
         if( topic === undefined || topic === null || topic.length == 0 ){ return false; }
         if( topic === '/db_log/global_network/' ){
+            
             if(message.includes(this.endpoint.id) ){ return false; }
-        try{
-            var endpoint = JSON.parse(message);
-        }
-        catch(e){
-            return false; 
-        }
-        if (endpoint.id === undefined || endpoint.qos === undefined 
-                || typeof(endpoint.qos) != 'number' || endpoint.qos > 1){ return false; }
-               
-            if(this.endpoints.length < 500){
-                this.endpoints.push(endpoint);              
+            try{
+                var endpoint = JSON.parse(message);
             }
+            catch(e){
+                return false; 
+            }
+            if (endpoint.id === undefined || endpoint.qos === undefined 
+                || typeof(endpoint.qos) != 'number' || endpoint.qos > 1){ return false; }
+            
+            this.endpoints.push(endpoint);   
+            if(this.endpoints.length > 500){                                                     // Push endpoint messages onto array untill buffer is full;
+                this.sendMessageBuffer();                                                        // then send endpoint buffer to dbworker
+            } 
+            return true;  
         }
-        if(topic === this.endpoint.id)
+        else if(topic === this.endpoint.id)
         {
-            this.onIncomming(message);   
+            this.onIncomming(message); 
+            return true;  
         }
-        return true;
+        return false;
     }
     onIncomming(message){   
         console.log(message.toString());   
