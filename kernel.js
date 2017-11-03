@@ -44,7 +44,16 @@ class Kernel {
         }
         this.uuid = this.getSessionID();      
     }
-   
+    commandMessage(endpoint){
+      var res  = endpoint.message.split('?');
+      var attr = res[1].split('#');
+      var hash = attr[1];
+        switch (res[0]){
+            case 'sync' :
+            console.log('syncing',attr[0]);
+            break;
+        }
+    }
     getID(){ 
         
         var id = this.localStorage.getItem('ID');
@@ -96,8 +105,7 @@ class Kernel {
                 if( topic === '/db_log/global_network/' ){
                  
                     try{
-                        var endpoint = JSON.parse(message);
-                                           
+                        var endpoint = JSON.parse(message);                   
                     }
                     catch(e){
                         close();
@@ -105,25 +113,39 @@ class Kernel {
 
                     if (endpoint.id === undefined || endpoint.qos === undefined 
                         || typeof(endpoint.qos) != 'number' || endpoint.qos > 1){ close(); }
-                    
-                    this.postMessage(message);
-
+                    endpoint.type = 'DBlog';
+                    this.postMessage(JSON.stringify(endpoint));
                     close();  
                 }
                 else if(topic === myId)
                 {
-                    this.postMessage(message);
+                    res = message.split(':')
+                    var endpoint = {
+                        type: 'Incomming',
+                        id: res[0],
+                        message: res[1]
+                    }
+                    this.postMessage(JSON.stringify(endpoint));
                     close();
                 }
+                close();
             }
         });
 
         worker.onerror = function (e){
             console.log(e.data);
         }
+       
+        var _this = this;
         worker.onmessage = function(e){
-            console.log(QOS);
-            var endpoint = JSON.parse(e.data);
+            
+           var endpoint = JSON.parse(e.data);
+            
+            if (endpoint.type === 'Incomming'){
+                _this.commandMessage(endpoint);
+            }
+            
+           
             var open = indexedDB.open("hivemind", 1);
 
             open.onupgradeneeded = function() {
