@@ -9,12 +9,32 @@ const IDBKeyRange = require("fake-indexeddb/lib/FDBKeyRange");
 var passed = true;
 
 class Kernel {
-
-    constructor(){
-        this.db = indexedDB.open("test", 3);       
-        this.db.onsuccess = function(e){
-            console.log('success');
+    get lastQOS(){ 
+        var lqos = this.localStorage.getItem('LastQOS');
+        if (lqos === null){
+            lqos = new Date().getTime();
+            this.lastQOS = lqos;
         }
+        return parseInt(lqos.toString());
+    }
+    set lastQOS(value) { 
+        this.localStorage.setItem('LastQOS',value);     
+    }
+    get QOS(){ 
+        var qos = this.localStorage.getItem('QOS');
+        if (qos === null || qos > 0.9999 || qos < 0){
+            qos = 0;
+            this.QOS = qos;
+        }
+        return parseFloat(qos);
+    }
+    set QOS(value) { 
+        var multiplyer = parseInt(new Date().getTime() / Math.pow(10,11));
+        this.localStorage.setItem('QOS',Math.round(value * Math.pow(10,multiplyer)) / Math.pow(10,multiplyer));     
+    }
+     
+    constructor(){
+        
         this.client;
         this.localStorage = new Storage('./db.json', { strict: false, ws: '  ' });
         this.sessionStorage = new Storage(null, { strict: true });
@@ -22,9 +42,9 @@ class Kernel {
             id: this.getID(),
             qos: this.calculateQOS()
         }
-        this.uuid = this.getSessionID();
+        this.uuid = this.getSessionID();      
     }
-
+   
     getID(){ 
         
         var id = this.localStorage.getItem('ID');
@@ -50,61 +70,7 @@ class Kernel {
                 password:'9C48FFB7FC319555C141DE44F726E40341' 
             });
             await this.client.on('connect', this.onConnect.bind(this));
-            var _this = this; 
-            await this.client.on('message', function (topic,message) { 
-                
-                var passed = true;
-                var worker = new Worker(function (){
-                    
-                    onmessage = function(e) {
-                        var res = e.data.split('|');
-                        var topic = res[0];
-                        var message = res[1];
-                        
-                        console.log();
-                        if( message === undefined || message === null || message.length == 0 ){ return false; }
-                        if( topic === undefined || topic === null || topic.length == 0 ){  return false; }
-                        if( topic === '/db_log/global_network/' ){
-                            //console.log(Kernel.getID());
-                           // if(message.includes(Kernel.endpoint.id) ){  return false; }
-
-                            try{
-                                var endpoint = JSON.parse(message);
-                                console.log(message);
-                            }
-                            catch(e){
-                                return false; 
-                            }
-
-                            if (endpoint.id === undefined || endpoint.qos === undefined 
-                                || typeof(endpoint.qos) != 'number' || endpoint.qos > 1){ Kernel.passed = false; return false; }
-                            
-                            postMessage(message);
-                            return true;  
-                        }
-                        else if(topic === Kernel.endpoint.id)
-                        {
-                            postMessage(message);
-                            return true;  
-                        }
-                        return false;
-                
-                        
-                        };  
-                         
-                });
-            
-                
-                worker.postMessage(topic + '|' + message.toString());
-
-                worker.onmessage = function(e){
-                    
-                    console.log(e.data);
-            
-                };
-
-
-            });   
+            await this.client.on('message', this.onMessage.bind(this)); 
         }
         catch(e){
             console.log(e);
@@ -112,11 +78,86 @@ class Kernel {
         }
         return true;
     }
+    async onMessage(topic,message){
+        
+        var worker = new Worker(function (){
+            
+            onmessage = function(e) {
+                
+                res = JSON.parse(e.data);
+
+                var topic = res.topic;
+                var message = res.message;
+                var myId = res.myId;
+                var QOS = res.qos;
+
+                if( message === undefined || message === null || message.length == 0 ){ close(); }
+                if( topic === undefined || topic === null || topic.length == 0 ){  close(); }
+                if( topic === '/db_log/global_network/' ){
+                 
+                    try{
+                        var endpoint = JSON.parse(message);
+                                           
+                    }
+                    catch(e){
+                        close();
+                    }
+
+                    if (endpoint.id === undefined || endpoint.qos === undefined 
+                        || typeof(endpoint.qos) != 'number' || endpoint.qos > 1){ close(); }
+                    
+                    this.postMessage(message);
+
+                    close();  
+                }
+                else if(topic === myId)
+                {
+                    this.postMessage(message);
+                    close();
+                }
+            }
+        });
+
+        worker.onerror = function (e){
+            console.log(e.data);
+        }
+        worker.onmessage = function(e){
+            console.log(QOS);
+            var endpoint = JSON.parse(e.data);
+            var open = indexedDB.open("hivemind", 1);
+
+            open.onupgradeneeded = function() {
+                var db = open.result;
+                var store = db.createObjectStore("global_network", {keyPath: "id"});
+                var index = store.createIndex("endpoint", ["id", "qos"]);
+            };
+            open.onsuccess  = function() {
+                var db = open.result;
+                var tx = db.transaction("global_network", "readwrite");
+                var store = tx.objectStore("global_network");
+                var index = store.index("endpoint");
+                store.put({id: 12345, endpoint: {id: endpoint.id, qos: endpoint.qos}});
+            }
+            tx.oncomplete = function() {
+                db.close();
+            };
+        }
+    
+
+        var workerMessage = {
+            topic: topic,
+            message: message.toString(),
+            myId: this.endpoint.id,
+            qos: this.QOS
+        }
+        await worker.postMessage(JSON.stringify(workerMessage));
+        
+    }
     async onConnect(){
         try{
             await this.client.subscribe('/db_log/global_network/');
             await this.client.subscribe(this.endpoint.id);
-            await this.dblog(JSON.stringify(this.endpoint));
+            await this.mqttSend('/db_log/global_network/',JSON.stringify(this.endpoint));
             return true;
         }
         catch(e){
@@ -124,15 +165,15 @@ class Kernel {
             return false;
         } 
     }
-    async dblog(endpoint){
-        await this.client.publish('/db_log/global_network/',endpoint);
+    async mqttSend(topic,endpoint){
+        await this.client.publish(topic,endpoint);
     }
-    
-    onIncomming(message){   
-        console.log(message.toString());   
-    }
+
     calculateQOS(){
-        return 0.0075;
+        var time = new Date().getTime();
+        var deltaTime = parseFloat((Math.round(time - this.lastQOS)) / Math.pow(10,15));
+        this.lastQOS = time;
+        return this.QOS += deltaTime;
     } 
 }
 module.exports = {Kernel,passed};

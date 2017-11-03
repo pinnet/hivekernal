@@ -39,62 +39,62 @@ describe('Kernel Mqtt connection (kernel.js)',() => {
 });
 describe('Kernel onMessage(message) (kernel.js)',() => {
     it('onMessage should accept correct db log message', (done) => {
-        var result = kernel.dblog('{"id":"1","qos": 0}'); 
+        var result = kernel.mqttSend('/db_log/global_network/','{"id":"1","qos": 0}'); 
         expect(passed).toBeTruthy();
         done();
     });
     it('onMessage should accept correct incomming message', (done) => {
-        var result = kernel.dblog(kernel.localStorage.getItem('ID'),'test'); 
+        var result = kernel.mqttSend(kernel.localStorage.getItem('ID'),'test'); 
         expect(passed).toBeTruthy();
         done();
     });
     it('onMessage should reject undefined message', (done) => {
-        var result = kernel.dblog(undefined); 
+        var result = kernel.mqttSend('/db_log/global_network/',undefined); 
         expect(passed).toBeFalsy();
         done();
     });
     it('onMessage should reject null message', (done) => {
-        var result = kernel.dblog(null); 
+        var result = kernel.mqttSend('/db_log/global_network/',null); 
         expect(passed).toBeFalsy();
         done();
     });
     it('onMessage should reject empty message', (done) => {
-        var result = kernel.dblog(''); 
+        var result = kernel.mqttSend('/db_log/global_network/',''); 
         expect(passed).toBeFalsy();
         done();
     });
     it('onMessage should reject invalid endpoint [qos NAN]', (done) => {
-        var result = kernel.dblog('{"id":"123","qos":"0"}'); 
+        var result = kernel.mqttSend('/db_log/global_network/','{"id":"123","qos":"0"}'); 
         expect(passed).toBeFalsy();
         done();
     });
     it('onMessage should reject invalid endpoint [qos > 1]', (done) => {
-        var result = kernel.dblog('{"id":"123","qos":1.234}'); 
+        var result = kernelmqttSend('/db_log/global_network/','{"id":"123","qos":1.234}'); 
         expect(passed).toBeFalsy();
         done();
     });
     it('onMessage should reject malformed endpoint', (done) => {
-        var result = kernel.dblog('{"id":"1","qos":0'); 
+        var result = kernel.mqttSend('/db_log/global_network/','{"id":"1","qos":0'); 
         expect(passed).toBeFalsy();
         done();
     });
     it('onMessage should reject undefined topic', (done) => {
-        var result = kernel.dblog(undefined); 
+        var result = kernel.mqttSend(undefined,'undefined topic'); 
         expect(passed).toBeFalsy();
         done();
     });
     it('onMessage should reject empty topic', (done) => {
-        var result = kernel.dblog(''); 
+        var result = kernel.mqttSend('','Empty Topic'); 
         expect(passed).toBeFalsy();
         done();
     });
     it('onMessage should reject null topic', (done) => {
-        var result = kernel.dblog(null); 
+        var result = kernel.mqttSend(null,'null test'); 
         expect(passed).toBeFalsy();
         done();
     });
     it('onMessage should reject own id on topic /db_log/global_network/', (done) => {
-        var result = kernel.dblog(Kernel.getID()); 
+        var result = kernel.mqttSend('/db_log/global_network/',Kernel.getID()); 
         expect(passed).toBeFalsy();
         done();
     });
@@ -102,7 +102,7 @@ describe('Kernel onMessage(message) (kernel.js)',() => {
         
         var result = false;
         for (var n =0;n < 5;n++){
-            result = kernel.dblog('{"id":"'+ uuidv4() +'","qos":0}'); 
+            result = kernel.mqttSend('/db_log/global_network/','{"id":"'+ uuidv4() +'","qos":0}'); 
         }
         expect(passed).toBeTruthy();
         done();
